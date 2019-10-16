@@ -1,21 +1,14 @@
 import { Block, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import withWeapp from '@tarojs/with-weapp'
+import classnames from 'classnames'
+import getQuestion from './questions'
 import './index.scss'
+
 // pages/sudoku/index.js
 var numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-var initMatrix = [
-  [8, 5, 0, 0, 0, 2, 4, 0, 0],
-  [7, 2, 0, 0, 0, 0, 0, 0, 9],
-  [0, 0, 4, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 1, 0, 7, 0, 0, 2],
-  [3, 0, 5, 0, 0, 0, 9, 0, 0],
-  [0, 4, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 8, 0, 0, 7, 0],
-  [0, 1, 7, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 3, 6, 0, 4, 0]
-]
-var matrix = initMatrix.map(row => {
+var mata = getQuestion()
+var initMatrix = () => mata.map(row => {
   return row.map(cell => {
     return {
       value: cell,
@@ -29,7 +22,7 @@ var matrix = initMatrix.map(row => {
    * 页面的初始数据
    */
   data: {
-    matrix,
+    matrix: initMatrix(),
     validNumbers: numbers.map(item => {
       return { value: item, disabled: false }
     }),
@@ -42,7 +35,11 @@ var matrix = initMatrix.map(row => {
   /**
    * 生命周期函数--监听页面加载
    */
-  onLoad: function(options) {},
+  onLoad: function(options) {
+    this.setData({
+      matrix: initMatrix(),
+    })
+  },
 
   /**
    * 生命周期函数--监听页面初次渲染完成
@@ -81,16 +78,21 @@ var matrix = initMatrix.map(row => {
 
   onCellTouch: function(e, ownerInstance) {
     // 点击格子，页面下方显示可选数字
-    var target = e.target
+    var target = e.currentTarget
     // 点击了i行j列
     var i = target.dataset.i,
       j = target.dataset.j
     if (i === undefined || j === undefined) {
       return
     }
+    var matrix = this.data.matrix
     // 当前格子的数字
     var currentNumber = matrix[i][j]
     if (currentNumber.origin) {
+      this.setData({
+        activeCell: { i: null, j: null },
+        validNumbers: numbers.map(item => ({ value: item, disabled: true }))
+      })
       return
     }
     var filledNumbers = new Set()
@@ -104,6 +106,13 @@ var matrix = initMatrix.map(row => {
     matrix.map(item => {
       filledNumbers.add(item[j].value)
     })
+    // 遍历小宫格
+    numbers.map((item, idx) => {
+      var row = 3*Math.floor(i/3) + Math.floor(idx/3)
+      var col = 3*Math.floor(j/3) + idx%3
+      filledNumbers.add(matrix[row][col].value)
+    })
+
     var validNumbers = numbers.map(item => {
       return {
         value: item,
@@ -117,8 +126,90 @@ var matrix = initMatrix.map(row => {
         j
       }
     })
-  }
+  },
+  // 填入数字
+  handleFillNumber: function(e) {
+    var cell = e.target.dataset.v
+    var { i, j } = this.data.activeCell
+    if (cell.disabled || i === null || j === null) {
+      return
+    }
+    var matrix = this.data.matrix.slice()
+    matrix[i][j] = {
+      value: cell.value,
+    }
+    this.setData({
+      matrix,
+    })
+    if (this.sudokuFinished()) {
+      const success = this.resultJudge()
+      Taro.showModal({
+        title: success ? '成功' : '失败',
+        content: success ? '你真棒' : '什么地方填错了',
+        confirmText: '清空',
+      }).then(res => res.confirm ? this.clearCell() : null)
+    }
+  },
+  sudokuFinished: function () {
+    var { matrix } = this.data
+    for (var i = 0; i < 9; i++) {
+      for (var j = 0; j < 9; j++) {
+        if (!matrix[i][j].value) {
+          return false
+        }
+      }
+    }
+    return true
+  },
+  // 判定是否完成
+  resultJudge: function () {
+    var { matrix } = this.data
+    for (var i = 0; i < 9; i++) {
+      var rowSet = new Set()
+      var colSet = new Set()
+      var subSet = new Set()
+      for (var j = 0; j < 9; j++) {
+        if (rowSet.has(matrix[i][j].value)) {
+          return false
+        } else {
+          rowSet.add(matrix[i][j].value)
+        }
+        if (colSet.has(matrix[j][i].value)) {
+          return false
+        } else {
+          colSet.add(matrix[j][i].value)
+        }
+        var row = 3*Math.floor(i/3) + Math.floor(j/3)
+        var col = 3*(i%3) + j%3
+        if (subSet.has(matrix[row][col].value)) {
+          return false
+        } else {
+          subSet.add(matrix[row][col].value)
+        }
+      }
+    }
+    return true
+  },
+  clearCell: function () {
+    var { i, j } = this.data.activeCell
+    if (i === null || j === null) {
+      return
+    }
+    var { matrix } = this.data
+    matrix[i][j] = {
+      value: 0,
+    }
+    this.setData({
+      matrix: matrix.slice(),
+    })
+  },
+  clearAll: function () {
+    this.setData({
+      matrix: initMatrix(),
+    })
+  },
 })
+
 class _C extends Taro.Component {
   config = {}
 
@@ -133,15 +224,15 @@ class _C extends Taro.Component {
                 {row.map((cell, j) => {
                   return (
                     <View
-                      className="cell"
+                      className={classnames('cell', {
+                        'origin-cell': cell.origin,
+                      })}
                       key={i}
-                      data-i={i}
-                      data-j={j}
+                      dataI={i}
+                      dataJ={j}
                       onClick={this.onCellTouch}
                     >
-                      <View className={cell.origin ? 'origin-cell' : ''}>
-                        {cell.value ? cell.value : ''}
-                      </View>
+                      {cell.value ? cell.value : ''}
                     </View>
                   )
                 })}
@@ -152,13 +243,21 @@ class _C extends Taro.Component {
         <View className="footer">
           {validNumbers.map((item, index) => {
             return (
-              <View className="cell">
-                <View className={item.disabled ? 'disabled' : ''}>
-                  {item.value}
-                </View>
+              <View
+                className={classnames('cell', {
+                  disabled: item.disabled,
+                })}
+                dataV={item}
+                onClick={this.handleFillNumber}
+              >
+                {item.value}
               </View>
             )
           })}
+        </View>
+        <View className="footer">
+          <Button onClick={this.clearCell}>删除</Button>
+          <Button onClick={this.clearAll}>全部清空</Button>
         </View>
       </View>
     )
