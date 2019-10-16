@@ -1,0 +1,52 @@
+/* pages/sudoku/index.wxss */
+.sudoku {
+  border: 2px solid bisque;
+}
+.row {
+  display: flex;
+}
+.row:nth-child(3n) {
+  border-bottom: 4px solid bisque;
+}
+.row:last-child {
+  border-bottom: none;
+}
+.cell {
+  display: inline-block;
+  text-align: center;
+  width: 70px;
+  height: 70px;
+  line-height: 70px;
+  border: 2px solid bisque;
+}
+.cell > view {
+  width: 100%;
+  height: 100%;
+}
+.cell > view:active {
+  box-shadow: inset 0px 0px 12px coral;
+  border-color: coral;
+}
+.origin-cell {
+  font-weight: bold;
+}
+.sudoku .cell:nth-child(3n) {
+  border-right: 6px solid bisque;
+}
+.sudoku .cell:last-child {
+  border-right: 2px solid bisque;
+}
+
+
+.footer {
+  margin-top: 50px;
+  display: flex;
+}
+.footer .cell {
+  background-color: bisque;
+  border-color: white;
+}
+.footer .cell .disabled {
+  background-color: #eee;
+  color: #999;
+}
